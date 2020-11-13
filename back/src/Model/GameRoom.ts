@@ -1,6 +1,6 @@
 import {PointInterface} from "./Websocket/PointInterface";
 import {Group} from "./Group";
-import {User} from "./User";
+import {User, UserSocket} from "./User";
 import {ExSocketInterface} from "_Model/Websocket/ExSocketInterface";
 import {PositionInterface} from "_Model/PositionInterface";
 import {Identificable} from "_Model/Websocket/Identificable";
@@ -11,6 +11,8 @@ import {Movable} from "_Model/Movable";
 import {extractDataFromPrivateRoomId, extractRoomSlugPublicRoomId, isRoomAnonymous} from "./RoomIdentifier";
 import {arrayIntersect} from "../Services/ArrayHelper";
 import {MAX_USERS_PER_ROOM} from "../Enum/EnvironmentVariable";
+import {JoinRoomMessage} from "../Messages/generated/messages_pb";
+import {ProtobufUtils} from "../Model/Websocket/ProtobufUtils";
 
 export type ConnectCallback = (user: User, group: Group) => void;
 export type DisconnectCallback = (user: User, group: Group) => void;
@@ -42,6 +44,7 @@ export class GameRoom {
     public readonly roomSlug: string;
     public readonly worldSlug: string = '';
     public readonly organizationSlug: string = '';
+    private nextUserId: number = 1;
 
     constructor(roomId: string,
                 connectCallback: ConnectCallback,
@@ -85,23 +88,32 @@ export class GameRoom {
         return this.users;
     }
 
-    public join(socket : ExSocketInterface, userPosition: PointInterface): void {
-        const user = new User(socket.userId, socket.userUuid, userPosition, false, this.positionNotifier, socket);
-        this.users.set(socket.userId, user);
+    public join(socket : UserSocket, joinRoomMessage: JoinRoomMessage): User {
+        const positionMessage = joinRoomMessage.getPositionmessage();
+        if (positionMessage === undefined) {
+            throw new Error('Missing position message');
+        }
+        const position = ProtobufUtils.toPointInterface(positionMessage);
+
+
+        const user = new User(this.nextUserId, joinRoomMessage.getUseruuid(), position, false, this.positionNotifier, socket, joinRoomMessage.getTagList(), joinRoomMessage.getName(), ProtobufUtils.toCharacterLayerObjects(joinRoomMessage.getCharacterlayerList()));
+        this.nextUserId++;
+        this.users.set(user.id, user);
         // Let's call update position to trigger the join / leave room
         //this.updatePosition(socket, userPosition);
         this.updateUserGroup(user);
+        return user;
     }
 
-    public leave(user : Identificable){
-        const userObj = this.users.get(user.userId);
+    public leave(user : User){
+        const userObj = this.users.get(user.id);
         if (userObj === undefined) {
-            console.warn('User ', user.userId, 'does not belong to world! It should!');
+            console.warn('User ', user.id, 'does not belong to this game room! It should!');
         }
         if (userObj !== undefined && typeof userObj.group !== 'undefined') {
             this.leaveGroup(userObj);
         }
-        this.users.delete(user.userId);
+        this.users.delete(user.id);
 
         if (userObj !== undefined) {
             this.positionNotifier.removeViewport(userObj);
@@ -117,12 +129,7 @@ export class GameRoom {
         return this.users.size === 0;
     }
 
-    public updatePosition(socket : Identificable, userPosition: PointInterface): void {
-        const user = this.users.get(socket.userId);
-        if(typeof user === 'undefined') {
-            return;
-        }
-
+    public updatePosition(user : User, userPosition: PointInterface): void {
         user.setPosition(userPosition);
 
         this.updateUserGroup(user);
@@ -170,12 +177,7 @@ export class GameRoom {
         }
     }
 
-    setSilent(socket: Identificable, silent: boolean) {
-        const user = this.users.get(socket.userId);
-        if(typeof user === 'undefined') {
-            console.warn('In setSilent, could not find user with ID "'+socket.userId+'" in world.');
-            return;
-        }
+    setSilent(user: User, silent: boolean) {
         if (user.silent === silent) {
             return;
         }
@@ -186,7 +188,7 @@ export class GameRoom {
         }
         if (!silent) {
             // If we are back to life, let's trigger a position update to see if we can join some group.
-            this.updatePosition(socket, user.getPosition());
+            this.updatePosition(user, user.getPosition());
         }
     }
 

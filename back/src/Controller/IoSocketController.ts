@@ -268,8 +268,8 @@ export class IoSocketController {
                     socketManager.handleViewport(client, message.getViewportmessage() as ViewportMessage);
                 } else if (message.hasUsermovesmessage()) {
                     socketManager.handleUserMovesMessage(client, message.getUsermovesmessage() as UserMovesMessage);
-                } else if (message.hasSetplayerdetailsmessage()) {
-                    socketManager.handleSetPlayerDetails(client, message.getSetplayerdetailsmessage() as SetPlayerDetailsMessage);
+                /*} else if (message.hasSetplayerdetailsmessage()) {
+                    socketManager.handleSetPlayerDetails(client, message.getSetplayerdetailsmessage() as SetPlayerDetailsMessage);*/
                 } else if (message.hasSilentmessage()) {
                     socketManager.handleSilentMessage(client, message.getSilentmessage() as SilentMessage);
                 } else if (message.hasItemeventmessage()) {

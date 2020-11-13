@@ -199,7 +199,7 @@ export class RoomConnection implements RoomConnection {
         const positionMessage = new PositionMessage();
         positionMessage.setX(Math.floor(x));
         positionMessage.setY(Math.floor(y));
-        let directionEnum: PositionMessage.DirectionMap[keyof PositionMessage.DirectionMap];
+        let directionEnum: Direction;
         switch (direction) {
             case 'up':
                 directionEnum = Direction.UP;
