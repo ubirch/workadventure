@@ -1,0 +1,32 @@
+[global]
+  checkNewVersion = false
+  sendAnonymousUsage = false
+[serversTransport]
+  insecureSkipVerify = true
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+  [entryPoints.websecure]
+    address = ":443"
+[log]
+  level = "DEBUG"
+[accessLog]
+  format = "common"
+  filePath = "/dev/null"
+[api]
+  dashboard = true
+  insecure = true
+[ping]
+[providers.docker]
+  network = "proxy_web"
+  exposedByDefault = false
+  defaultRule = "Host(`{{ normalize .Name }}.docker.localhost`)"
+# we are loading an additional file, as some options can only be defined
+# in a 'dynamic' file config, not in this main config file.
+[providers.file]
+  filename = "/etc/traefik/dynamic_conf.toml"
+[certificatesResolvers.default.acme]
+  email = "service-admin@ubirch.com"
+  storage = "/cert/acme.json"
+  [certificatesResolvers.default.acme.httpChallenge]
+    entryPoint = "web"
