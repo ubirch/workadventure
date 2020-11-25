@@ -1,4 +1,5 @@
 version: "3"
+
 services:
   reverse-proxy:
     image: traefik:v2.3
@@ -10,8 +11,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      # The Web UI (enabled by --api.insecure=true)
-      # - "8080:8080"
     depends_on:
       - back
       - front
@@ -20,12 +19,29 @@ services:
       - ./config:/etc/traefik/:ro
       - ./cert/:/cert/
 
+  redirect-main:
+    image: registry.gitlab.com/zombuild/docker-redirect
+    environment:
+      - "REDIRECT_URL=https://ubirch.com"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.routers.http-catchall.tls.domains[0].main=play.ubirch.xyz"
-      - "traefik.http.routers.http-catchall.tls.domains[0].sans=api.ubirch.xyz"
-      - "traefik.http.routers.http-catchall.tls.certresolver=default"
+      - "traefik.http.routers.redirect-main.rule=Host(`ubirch.world`)"
+      - "traefik.http.routers.redirect-main.priority=1"
+      - "traefik.http.routers.redirect-main.tls=true"
+      - "traefik.http.routers.redirect-main.tls.domains[0].main=ubirch.world"
+      - "traefik.http.routers.redirect-main.tls.certresolver=default"
+
+  redirect-office:
+    image: registry.gitlab.com/zombuild/docker-redirect
+    environment:
+      - "REDIRECT_URL=https://play.ubirch.world/_/global/raw.githubusercontent.com/ubirch/workadventure_map/master/map.json"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redirect-office.rule=Host(`ubirch.world`) && Path(`/office`)"
+      - "traefik.http.routers.redirect-office.priority=2"
+      - "traefik.http.routers.redirect-office.tls=true"
+      - "traefik.http.routers.redirect-office.tls.domains[0].main=ubirch.world"
+      - "traefik.http.routers.redirect-office.tls.certresolver=default"
 
   front:
     image: thecodingmachine/nodejs:14
@@ -35,7 +51,7 @@ services:
       JITSI_PRIVATE_MODE: "$JITSI_PRIVATE_MODE"
       HOST: "0.0.0.0"
       NODE_ENV: development
-      API_URL: api.ubirch.xyz
+      API_URL: api.ubirch.world
       ADMIN_URL: admin.workadventure.localhost
       STARTUP_COMMAND_1: yarn install
       TURN_SERVER: "turn:coturn.workadventu.re:443,turns:coturn.workadventu.re:443"
@@ -47,21 +63,16 @@ services:
       - ./front:/usr/src/app
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.front.rule=Host(`play.ubirch.xyz`)"
-      - "traefik.http.routers.front.entryPoints=web,traefik"
+      - "traefik.http.routers.front.rule=Host(`play.ubirch.world`)"
       - "traefik.http.services.front.loadbalancer.server.port=8080"
-      - "traefik.http.routers.front-ssl.rule=Host(`play.ubirch.xyz`)"
-      - "traefik.http.routers.front-ssl.entryPoints=websecure"
-      - "traefik.http.routers.front-ssl.tls=true"
-      - "traefik.http.routers.front-ssl.tls.certresolver=default"
-      - "traefik.http.routers.front-ssl.service=front"
-
+      - "traefik.http.routers.front.tls=true"
+      - "traefik.http.routers.front.tls.domains[0].main=play.ubirch.world"
+      - "traefik.http.routers.front.tls.certresolver=default"
 
   back:
     image: thecodingmachine/nodejs:12
     command: yarn dev
     restart: on-failure
-    #command: yarn run profile
     environment:
       STARTUP_COMMAND_1: yarn install
       SECRET_KEY: yourSecretKey
@@ -74,38 +85,18 @@ services:
       - ./back:/usr/src/app
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.back.rule=Host(`api.ubirch.xyz`)"
-      - "traefik.http.routers.back.entryPoints=web"
+      - "traefik.http.routers.back.rule=Host(`api.ubirch.world`)"
+      - "traefik.http.routers.back.tls=true"
+      - "traefik.http.routers.back.tls.domains[0].main=api.ubirch.world"
+      - "traefik.http.routers.back.tls.certresolver=default"
       - "traefik.http.services.back.loadbalancer.server.port=8080"
-      - "traefik.http.routers.back-ssl.rule=Host(`api.ubirch.xyz`)"
-      - "traefik.http.routers.back-ssl.entryPoints=websecure"
-      - "traefik.http.routers.back-ssl.tls.certresolver=default"
-      - "traefik.http.routers.back-ssl.tls=true"
-      - "traefik.http.routers.back-ssl.service=back"
 
-  website:                                                                     
-    image: thecodingmachine/nodejs:12-apache                                   
-    environment:                                                               
-      STARTUP_COMMAND_1: npm install                                           
-      STARTUP_COMMAND_2: npm run watch &                                       
-      APACHE_DOCUMENT_ROOT: dist/                                              
-    volumes:                                                                   
-      - ./website:/var/www/html                                                
-    labels:                                                                    
-      - "traefik.http.routers.website.rule=Host(`workadventure.localhost`)"    
-      - "traefik.http.routers.website.entryPoints=web"                         
-      - "traefik.http.services.website.loadbalancer.server.port=80"            
-      - "traefik.http.routers.website-ssl.rule=Host(`workadventure.localhost`)"
-      - "traefik.http.routers.website-ssl.entryPoints=websecure"               
-      - "traefik.http.routers.website-ssl.tls=true"                            
-      - "traefik.http.routers.website-ssl.service=website"                     
-
-  messages:
-    image: thecodingmachine/workadventure-back-base:latest
-    environment:
-      STARTUP_COMMAND_1: yarn install
-      STARTUP_COMMAND_2: yarn run proto:watch
-    volumes:
-      - ./messages:/usr/src/app
-      - ./back:/usr/src/back
-      - ./front:/usr/src/front
+# messages:
+#   image: thecodingmachine/workadventure-back-base:latest
+#   environment:
+#     STARTUP_COMMAND_1: yarn install
+#     STARTUP_COMMAND_2: yarn run proto:watch
+#   volumes:
+#     - ./messages:/usr/src/app
+#     - ./back:/usr/src/back
+#     - ./front:/usr/src/front
