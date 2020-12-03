@@ -25,8 +25,8 @@ services:
       - "REDIRECT_URL=https://ubirch.com"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.redirect-main.rule=Host(`ubirch.world`)"
-      - "traefik.http.routers.redirect-main.priority=1"
+      - "traefik.http.routers.redirect-main.rule=Host(`ubirch.world`) && Path(`/{firstlevel:[a-zA-Z0-9-_]*}`)"
+      - "traefik.http.routers.redirect-main.priority=1000"
       - "traefik.http.routers.redirect-main.tls=true"
       - "traefik.http.routers.redirect-main.tls.domains[0].main=ubirch.world"
       - "traefik.http.routers.redirect-main.tls.certresolver=default"
@@ -34,11 +34,11 @@ services:
   redirect-office:
     image: registry.gitlab.com/zombuild/docker-redirect
     environment:
-      - "REDIRECT_URL=https://play.ubirch.world/_/global/raw.githubusercontent.com/ubirch/workadventure_map/master/map.json"
+      - "REDIRECT_URL=https://ubirch.world/_/global/raw.githubusercontent.com/ubirch/workadventure_map/master/map.json"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.redirect-office.rule=Host(`ubirch.world`) && Path(`/office`)"
-      - "traefik.http.routers.redirect-office.priority=2"
+      - "traefik.http.routers.redirect-office.priority=2000"
       - "traefik.http.routers.redirect-office.tls=true"
       - "traefik.http.routers.redirect-office.tls.domains[0].main=ubirch.world"
       - "traefik.http.routers.redirect-office.tls.certresolver=default"
@@ -63,11 +63,14 @@ services:
       - ./front:/usr/src/app
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.front.rule=Host(`play.ubirch.world`)"
+      - "traefik.http.routers.front.rule=Host(`ubirch.world`)"
       - "traefik.http.services.front.loadbalancer.server.port=8080"
       - "traefik.http.routers.front.tls=true"
-      - "traefik.http.routers.front.tls.domains[0].main=play.ubirch.world"
+      - "traefik.http.routers.front.tls.domains[0].main=ubirch.world"
       - "traefik.http.routers.front.tls.certresolver=default"
+      - "traefik.http.middlewares.static-password.basicauth.users=cyber:$$apr1$$6tb1v72w$$ka6/d71wy.YI7s9dKJeY50"
+      - "traefik.http.routers.front.middlewares=static-password"
+
 
   back:
     image: thecodingmachine/nodejs:12
@@ -78,7 +81,7 @@ services:
       SECRET_KEY: yourSecretKey
       SECRET_JITSI_KEY: "$SECRET_JITSI_KEY"
       ALLOW_ARTILLERY: "true"
-      ADMIN_API_TOKEN: "$ADMIN_API_TOKEN"
+      ADMIN_API_TOKEN: "OpelCalibra"
       JITSI_URL: "meet.ffmuc.net"
       JITSI_ISS: $JITSI_ISS
     volumes:
